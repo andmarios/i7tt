@@ -2,6 +2,7 @@
 package main
 
 import (
+	"flag"
 	_ "fmt"
 	"github.com/gizak/termui"
 	"io/ioutil"
@@ -24,6 +25,16 @@ var label_files = []string{
 	"/sys/devices/platform/coretemp.0/hwmon/hwmon1/temp4_label",
 	"/sys/devices/platform/coretemp.0/hwmon/hwmon1/temp5_label"}
 
+var history_length = 200
+
+var avg_duration int
+
+func init() {
+	flag.IntVar(&avg_duration, "avg", 30, "avg period in seconds")
+	flag.IntVar(&avg_duration, "a", 30, "avg period in seconds"+
+		" (shorthand)")
+}
+
 func check(e error) {
 	if e != nil {
 		panic(e)
@@ -31,6 +42,7 @@ func check(e error) {
 }
 
 func main() {
+	flag.Parse()
 	label := append([]string(nil), label_files...)
 	for i, file := range label_files {
 		dat, err := ioutil.ReadFile(file)
@@ -40,8 +52,11 @@ func main() {
 	}
 
 	counter := time.Tick(1 * time.Second)
-	counterH_Tick := 2
-	counterH := make(chan int, 1) // counterH comes from counter. If it was independent, we wouldn't be able to make sure that counterH ticks always between counterH_Tick runs of counter
+	counterH_Tick := avg_duration
+	// counterH comes from counter. If it was independent, we wouldn't be
+	// able to make sure that counterH ticks always between counterH_Tick
+	// runs of counter
+	counterH := make(chan int, 1)
 
 	err := termui.Init()
 	check(err)
@@ -62,73 +77,39 @@ func main() {
 
 	add_to_label := ", " + strconv.Itoa(counterH_Tick) + " sec avg (°C) "
 	// LineChart
-	lc0 := termui.NewLineChart()
-	lc0.Border.Label = " " + label[0] + add_to_label
-	//	lc0.Width = 58
-	lc0.Height = 16
-	//	lc0.X = 58 + 1
-	lc0.LineColor = termui.ColorCyan | termui.AttrBold
-	//	lc0.Mode = "dot"
 
-	lc1 := termui.NewLineChart()
-	lc1.Border.Label = " " + label[1] + add_to_label
-	//	lc1.Width = 58
-	lc1.Height = 16
-	//	lc1.Y = 16 + 1
-	lc1.LineColor = termui.ColorCyan | termui.AttrBold
-	//	lc1.Mode = "dot"
-
-	lc2 := termui.NewLineChart()
-	lc2.Border.Label = " " + label[2] + add_to_label
-	//	lc2.Width = 58
-	lc2.Height = 16
-	//	lc2.X = 58 + 1
-	//	lc2.Y = 16 + 1
-	lc2.LineColor = termui.ColorCyan | termui.AttrBold
-	//	lc2.Mode = "dot"
-
-	lc3 := termui.NewLineChart()
-	lc3.Border.Label = " " + label[3] + add_to_label
-	//	lc3.Width = 58
-	lc3.Height = 16
-	//	lc3.Y = 16 + 1 + 16 + 1
-	//	lc3.LineColor = termui.ColorCyan | termui.AttrBold
-	//	lc3.Mode = "dot"
-
-	lc4 := termui.NewLineChart()
-	lc4.Border.Label = " " + label[4] + add_to_label
-	//	lc4.Width = 58
-	lc4.Height = 16
-	//	lc4.X = 58 + 1
-	//	lc4.Y = 16 + 1 + 16 + 1
-	lc4.LineColor = termui.ColorCyan | termui.AttrBold
-	//	lc4.Mode = "dot"
+	lc := make([]*termui.LineChart, len(temp_files))
+	for i := range lc {
+		lc[i] = termui.NewLineChart()
+		lc[i].Border.Label = " " + label[i] + add_to_label
+		lc[i].Height = 16
+		lc[i].LineColor = termui.ColorYellow | termui.AttrBold
+		lc[i].Border.LabelFgColor = termui.ColorGreen
+	}
 
 	temperature := make([]int, len(temp_files))
 	temperature_history := make([][]float64, len(temp_files))
 	for i := range temperature_history {
-		temperature_history[i] = make([]float64, 96)
+		temperature_history[i] = make([]float64, history_length)
 	}
 	temperature_temp_sum := make([]float64, len(temp_files))
-
-	lc0.Data = temperature_history[0]
-	lc1.Data = temperature_history[1]
-	lc2.Data = temperature_history[2]
-	lc3.Data = temperature_history[3]
-	lc4.Data = temperature_history[4]
 
 	termui.Body.AddRows(
 		termui.NewRow(
 			termui.NewCol(6, 0, bc),
-			termui.NewCol(6, 0, lc0)),
+			termui.NewCol(6, 0, lc[0])),
 		termui.NewRow(
-			termui.NewCol(6, 0, lc1),
-			termui.NewCol(6, 0, lc2)),
+			termui.NewCol(6, 0, lc[1]),
+			termui.NewCol(6, 0, lc[2])),
 		termui.NewRow(
-			termui.NewCol(6, 0, lc3),
-			termui.NewCol(6, 0, lc4)))
+			termui.NewCol(6, 0, lc[3]),
+			termui.NewCol(6, 0, lc[4])))
 	termui.Body.Align()
-	bc.BarWidth = ((termui.Body.Width / 2) - 2 - len(temp_files)) / len(temp_files)
+	bc.BarWidth = calc_bc_barwidth()
+	lc_dataoffset := calc_lc_dataoffset()
+	for i := range lc {
+		lc[i].Data = temperature_history[i][lc_dataoffset:]
+	}
 
 	termui.Render(termui.Body)
 
@@ -141,7 +122,8 @@ func main() {
 				dat, err := ioutil.ReadFile(file)
 				check(err)
 
-				value_string := strings.TrimSuffix(string(dat), "\n")
+				value_string :=
+					strings.TrimSuffix(string(dat), "\n")
 				value, err := strconv.Atoi(string(value_string))
 				check(err)
 				// fmt.Println(label[i], "|", value/1000, "°C")
@@ -159,25 +141,42 @@ func main() {
 			termui.Render(termui.Body)
 		case <-counterH:
 			for i := range temperature_history {
-				temperature_history[i] = append(temperature_history[i][1:], temperature_temp_sum[i]/float64(counterH_Tick))
+				temperature_history[i] = append(
+					temperature_history[i][1:],
+					temperature_temp_sum[i]/float64(counterH_Tick))
 			}
 			temperature_temp_sum = make([]float64, len(temp_files))
-			lc0.Data = temperature_history[0]
-			lc1.Data = temperature_history[1]
-			lc2.Data = temperature_history[2]
-			lc3.Data = temperature_history[3]
-			lc4.Data = temperature_history[4]
+			for i := range lc {
+				lc[i].Data = temperature_history[i][lc_dataoffset:]
+			}
 		case e := <-termui.EventCh():
 			// break MainLoop
-			if e.Type == termui.EventKey {
+			if e.Type == termui.EventKey && e.Ch == 'q' {
 				return
 			}
 			if e.Type == termui.EventResize {
 				termui.Body.Width = termui.TermWidth()
 				termui.Body.Align()
-				bc.BarWidth = ((termui.Body.Width / 2) - 2 - len(temp_files)) / len(temp_files)
+				bc.BarWidth = calc_bc_barwidth()
+				lc_dataoffset = calc_lc_dataoffset()
+				for i := range lc {
+					lc[i].Data =
+						temperature_history[i][lc_dataoffset:]
+				}
 				termui.Render(termui.Body)
 			}
 		}
 	}
+}
+
+func calc_lc_dataoffset() int {
+	length := (termui.Body.Width/2)*2 - 18
+	if length > history_length {
+		length = history_length
+	}
+	return history_length - length
+}
+
+func calc_bc_barwidth() int {
+	return ((termui.Body.Width / 2) - 3 - len(temp_files)) / len(temp_files)
 }
