@@ -28,7 +28,7 @@ You may set the average period length (default 30 seconds):
 
 ## Hacking
 
-As stated, it only work on similar configurations to mine. It should be fairly easy to adjust for any system though, since most part of the code is dynamic.
+As stateds it only works on similar configurations to mine. It should be fairly easy to adjust for any system though, since most part of the code is dynamic.
 
 To adjust for your system you should make 3 changes:
 
