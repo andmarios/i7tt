@@ -85,6 +85,12 @@ func main() {
 	detect_sensors()
 
 	num_of_inputs = len(temperature_files)
+
+	// You may uncomment the next two lines, to test with one less sensor.
+	// This is useful to debug for cases of odd and even num of sensors.
+	//	num_of_inputs -= 1
+	//	temperature_files = temperature_files[1:]
+
 	if num_of_inputs == 0 {
 		fmt.Println("No sensors found. Exiting.")
 	}
@@ -178,13 +184,20 @@ func main() {
 	termui.Body.AddRows(
 		termui.NewRow(
 			termui.NewCol(6, 0, bc),
-			termui.NewCol(6, 0, lc[0])),
-		termui.NewRow(
-			termui.NewCol(6, 0, lc[1]),
-			termui.NewCol(6, 0, lc[2])),
-		termui.NewRow(
-			termui.NewCol(6, 0, lc[3]),
-			termui.NewCol(6, 0, lc[4])))
+			termui.NewCol(6, 0, lc[0])))
+	for i := 1; i < num_of_inputs; i += 2 {
+		if num_of_inputs-i > 1 {
+			termui.Body.AddRows(
+				termui.NewRow(
+					termui.NewCol(6, 0, lc[i]),
+					termui.NewCol(6, 0, lc[i+1])))
+		} else {
+			termui.Body.AddRows(
+				termui.NewRow(
+					termui.NewCol(6, 0, lc[i])))
+		}
+	}
+
 	calc_row_height()
 	termui.Body.Align()
 
