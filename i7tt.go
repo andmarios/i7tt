@@ -61,7 +61,7 @@ func check(e error) {
 func detect_sensors() {
 	inputs, _ := regexp.Compile("coretemp.*temp([0-9]+)_input")
 	labels, _ := regexp.Compile("coretemp.*temp([0-9]+)_label")
-	criticals, _ := regexp.Compile("coretemp.*temp([0-9]+)_critical")
+	criticals, _ := regexp.Compile("coretemp.*temp([0-9]+)_crit")
 	maxes, _ := regexp.Compile("coretemp.*temp([0-9]+)_max")
 
 	check := func(path string, f os.FileInfo, err error) error {
@@ -86,7 +86,7 @@ func main() {
 
 	num_of_inputs = len(temperature_files)
 
-	// You may uncomment the next two lines, to test with one less sensor.
+	// You may uncomment the next two lines to test with one less sensor.
 	// This is useful to debug for cases of odd and even num of sensors.
 	//	num_of_inputs -= 1
 	//	temperature_files = temperature_files[1:]
@@ -125,8 +125,14 @@ func main() {
 	bc.DataLabels = label
 	bc.NumColor = termui.ColorWhite | termui.AttrBold
 	bc.BarGap = 1
-	// I assume a max temp of 95°C. In rare occasions you may see higher temps.
-	bc.SetMax(95)
+	// Set the max temperature as the critical temp of 1st input minus 10
+	dat, err := ioutil.ReadFile(critical_files[0])
+	check(err)
+	value_string :=
+		strings.TrimSuffix(string(dat), "\n")
+	value, err := strconv.Atoi(string(value_string))
+	check(err)
+	bc.SetMax(value/1000 - 10)
 	bc.BarColor = termui.ColorRed
 	bc.PaddingLeft = 1
 
