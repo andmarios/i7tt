@@ -27,7 +27,7 @@ import (
 	"time"
 )
 
-var temp_files = []string{
+var temperature_files = []string{
 	"/sys/devices/platform/coretemp.0/hwmon/hwmon1/temp1_input",
 	"/sys/devices/platform/coretemp.0/hwmon/hwmon1/temp2_input",
 	"/sys/devices/platform/coretemp.0/hwmon/hwmon1/temp3_input",
@@ -43,7 +43,10 @@ var label_files = []string{
 
 var history_length = 500
 
-var avg_duration int
+var (
+	avg_duration  int
+	num_of_inputs int
+)
 
 func init() {
 	flag.IntVar(&avg_duration, "avg", 30, "avg period in seconds")
@@ -59,6 +62,7 @@ func check(e error) {
 
 func main() {
 	flag.Parse()
+	num_of_inputs = len(temperature_files)
 
 	// Read temperature labels from /sys
 	label := append([]string(nil), label_files...)
@@ -69,14 +73,13 @@ func main() {
 		label[i] = value
 	}
 
-	// Create a 1 sec refresh counter and a counter based on counterH_Tick
+	// Create a 1 sec refresh counter and a counter based on avg_duration
 	// ticks of the 1 sec counter
 	counter := time.Tick(1 * time.Second)
-	counterH_Tick := avg_duration
-	// counterH comes from counter. If it was independent, we wouldn't be
-	// able to make sure that counterH ticks always between counterH_Tick
+	// counter_avg comes from counter. If it was independent, we wouldn't be
+	// able to make sure that counter_avg ticks exactly between avg_duration
 	// runs of counter
-	counterH := make(chan int, 1)
+	counter_avg := make(chan int, 5) // Should have at most 1 msg in queue
 
 	// Initialize termui instance
 	err := termui.Init()
@@ -98,9 +101,9 @@ func main() {
 	bc.PaddingLeft = 1
 
 	// This will be added to LineCharts' labels.
-	add_to_label := ", " + strconv.Itoa(counterH_Tick) + " sec avg (°C) "
+	add_to_label := ", " + strconv.Itoa(avg_duration) + " sec avg (°C) "
 	// Create LineCharts
-	lc := make([]*termui.LineChart, len(temp_files))
+	lc := make([]*termui.LineChart, num_of_inputs)
 	for i := range lc {
 		lc[i] = termui.NewLineChart()
 		lc[i].Border.Label = " " + label[i] + add_to_label
@@ -110,15 +113,15 @@ func main() {
 	}
 
 	// temperature holds the current temperatures
-	temperature := make([]int, len(temp_files))
+	temperature := make([]int, num_of_inputs)
 	// temperature_history holds arrays of temperatures history
-	temperature_history := make([][]float64, len(temp_files))
+	temperature_history := make([][]float64, num_of_inputs)
 	for i := range temperature_history {
 		temperature_history[i] = make([]float64, history_length)
 	}
 	// temperature_temp_sum holds the current avg period sums
 	// when the periods end we calc the avg and empty the arrays
-	temperature_temp_sum := make([]float64, len(temp_files))
+	temperature_temp_sum := make([]float64, num_of_inputs)
 
 	// Create a termui grid with our components.
 	// TODO: Make this part of code dynamic too, based on temperatures
@@ -158,7 +161,7 @@ func main() {
 		select {
 		case <-counter:
 			// Refresh counter. Read temps and update barchart.
-			for i, file := range temp_files {
+			for i, file := range temperature_files {
 				dat, err := ioutil.ReadFile(file)
 				check(err)
 				value_string :=
@@ -170,20 +173,20 @@ func main() {
 			}
 			bc.Data = temperature
 			rotate++
-			if rotate == counterH_Tick {
-				counterH <- 1
+			if rotate == avg_duration {
+				counter_avg <- 1
 				rotate = 0
 			}
 			termui.Render(termui.Body)
-		case <-counterH:
+		case <-counter_avg:
 			// Avg refresh counter. Calculate averages and add them
 			// to data.
 			for i := range temperature_history {
 				temperature_history[i] = append(
 					temperature_history[i][1:],
-					temperature_temp_sum[i]/float64(counterH_Tick))
+					temperature_temp_sum[i]/float64(avg_duration))
 			}
-			temperature_temp_sum = make([]float64, len(temp_files))
+			temperature_temp_sum = make([]float64, num_of_inputs)
 			for i := range lc {
 				lc[i].Data = temperature_history[i][lc_dataoffset:]
 			}
@@ -223,5 +226,5 @@ func calc_lc_dataoffset() int {
 // calc_bc_barwidth calculate the barchart's barwidth in order for the bars
 // to fill the chart.
 func calc_bc_barwidth() int {
-	return ((termui.Body.Width / 2) - 3 - len(temp_files)) / len(temp_files)
+	return ((termui.Body.Width / 2) - 3 - num_of_inputs) / num_of_inputs
 }
