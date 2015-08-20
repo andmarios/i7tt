@@ -15,7 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-// A package to display the CPU temperature of my i7 laptop.
+// A package to display the CPU temperature of Intel CPUs.
 package main
 
 import (
@@ -31,11 +31,23 @@ import (
 	"time"
 )
 
-var temperature_files = []string{}
-var label_files = []string{}
-var critical_files = []string{}
-var max_files = []string{}
+// Here are stored the filenames of the sys files we use.
+var (
+	temperature_files []string
+	label_files       []string
+	critical_files    []string
+	max_files         []string
+)
 
+// Here are stored the contents of the files described above.
+var (
+	temperature []int
+	label       []string
+	critical    []int
+	max         []int
+)
+
+// Points of history to keep.
 var history_length = 500
 
 var (
@@ -58,6 +70,8 @@ func check(e error) {
 	}
 }
 
+// detect_sensors tries to find files created from coretemp driver
+// that contain the info we seek
 func detect_sensors() {
 	inputs, _ := regexp.Compile("coretemp.*temp([0-9]+)_input")
 	labels, _ := regexp.Compile("coretemp.*temp([0-9]+)_label")
@@ -80,28 +94,53 @@ func detect_sensors() {
 	_ = filepath.Walk("/sys/devices/platform/", check)
 }
 
+// read_static_values reads once the contents of files that do not
+// change over time: sensor label, sensor max and critical temperature
+func read_static_values() {
+	// Read temperature labels from /sys
+	for _, file := range label_files {
+		dat, err := ioutil.ReadFile(file)
+		check(err)
+		value := strings.TrimSuffix(string(dat), "\n")
+		label = append(label, value)
+	}
+
+	// Read critical temperatures from /sys
+	for _, file := range critical_files {
+		dat, err := ioutil.ReadFile(file)
+		check(err)
+		value_string :=
+			strings.TrimSuffix(string(dat), "\n")
+		value, err := strconv.Atoi(string(value_string))
+		check(err)
+		critical = append(critical, value/1000)
+	}
+
+	// Read max temperatures from /sys
+	for _, file := range max_files {
+		dat, err := ioutil.ReadFile(file)
+		check(err)
+		value_string :=
+			strings.TrimSuffix(string(dat), "\n")
+		value, err := strconv.Atoi(string(value_string))
+		check(err)
+		max = append(max, value/1000)
+	}
+}
+
 func main() {
 	flag.Parse()
 	detect_sensors()
+	read_static_values()
 
 	num_of_inputs = len(temperature_files)
-
 	// You may uncomment the next two lines to test with one less sensor.
 	// This is useful to debug for cases of odd and even num of sensors.
 	//	num_of_inputs -= 1
 	//	temperature_files = temperature_files[1:]
-
 	if num_of_inputs == 0 {
 		fmt.Println("No sensors found. Exiting.")
-	}
-
-	// Read temperature labels from /sys
-	label := append([]string(nil), label_files...)
-	for i, file := range label_files {
-		dat, err := ioutil.ReadFile(file)
-		check(err)
-		value := strings.TrimSuffix(string(dat), "\n")
-		label[i] = value
+		os.Exit(1)
 	}
 
 	// Create a 1 sec refresh counter and a counter based on avg_duration
@@ -119,30 +158,23 @@ func main() {
 
 	// Create a BarChart
 	bc := termui.NewBarChart()
-	bc.Border.Label = " CPU Temperatures (°C), press Q to quit"
+	bc.Border.Label = " CPU Temperatures (°C), Q to quit, ↑↓ to resize"
 	bc.Border.LabelFgColor = termui.ColorWhite | termui.AttrBold
 	bc.TextColor = termui.ColorMagenta
 	bc.DataLabels = label
 	bc.NumColor = termui.ColorWhite | termui.AttrBold
 	bc.BarGap = 1
-	// Set the max temperature as the critical temp of 1st input minus 10
-	dat, err := ioutil.ReadFile(critical_files[0])
-	check(err)
-	value_string :=
-		strings.TrimSuffix(string(dat), "\n")
-	value, err := strconv.Atoi(string(value_string))
-	check(err)
-	bc.SetMax(value/1000 - 10)
+	// Set the initial bar max as the critical temp of 1st input minus 10
+	bc.SetMax(critical[0] - 10)
 	bc.BarColor = termui.ColorRed
 	bc.PaddingLeft = 1
 
-	// This will be added to LineCharts' labels.
-	add_to_label := ", " + strconv.Itoa(avg_duration) + " sec avg (°C) "
 	// Create LineCharts
 	lc := make([]*termui.LineChart, num_of_inputs)
 	for i := range lc {
 		lc[i] = termui.NewLineChart()
-		lc[i].Border.Label = " " + label[i] + add_to_label
+		lc[i].Border.Label = " " + label[i] + ", " +
+			strconv.Itoa(avg_duration) + " sec avg (°C) "
 		lc[i].LineColor = termui.ColorMagenta | termui.AttrBold
 		lc[i].Border.LabelFgColor = termui.ColorGreen | termui.AttrBold
 	}
@@ -158,7 +190,8 @@ func main() {
 		}
 	}
 
-	// calc_lc_dataoffset calculates the linechart's data offset (slice of data)
+	// calc_lc_dataoffset calculates the linechart's data offset (slice
+	// of data)
 	calc_lc_dataoffset := func() int {
 		length := (termui.Body.Width/2)*2 - 18
 		if length > history_length {
@@ -167,10 +200,11 @@ func main() {
 		return history_length - length
 	}
 
-	// calc_bc_barwidth calculate the barchart's barwidth in order for the bars
-	// to fill the chart.
+	// calc_bc_barwidth calculate the barchart's barwidth in order
+	// for the bars to fill the chart.
 	calc_bc_barwidth := func() int {
-		return ((termui.Body.Width / 2) - 3 - num_of_inputs) / num_of_inputs
+		return ((termui.Body.Width / 2) - 3 - num_of_inputs) /
+			num_of_inputs
 	}
 
 	// temperature holds the current temperatures
@@ -185,12 +219,12 @@ func main() {
 	temperature_temp_sum := make([]float64, num_of_inputs)
 
 	// Create a termui grid with our components.
-	// TODO: Make this part of code dynamic too, based on temperatures
-	// found. Every other part I believe is dynamic (except /sys discovery).
+	// It is a given that we at least have 2 widgets.
 	termui.Body.AddRows(
 		termui.NewRow(
 			termui.NewCol(6, 0, bc),
 			termui.NewCol(6, 0, lc[0])))
+	// Add rest of rows dynamically, accordinf to number of sensors.
 	for i := 1; i < num_of_inputs; i += 2 {
 		if num_of_inputs-i > 1 {
 			termui.Body.AddRows(
@@ -224,12 +258,13 @@ func main() {
 	termui.Render(termui.Body)
 
 	// MainLoop:
-	rotate := 0 // used to track the current avg period current step
+	rotate := 0 // used to track the current_avg period current step
 	evt := termui.EventCh()
 	for {
 		select {
 		case <-counter:
 			// Refresh counter. Read temps and update barchart.
+			bc.BarColor = termui.ColorYellow
 			for i, file := range temperature_files {
 				dat, err := ioutil.ReadFile(file)
 				check(err)
@@ -237,8 +272,12 @@ func main() {
 					strings.TrimSuffix(string(dat), "\n")
 				value, err := strconv.Atoi(string(value_string))
 				check(err)
+
 				temperature[i] = value / 1000
 				temperature_temp_sum[i] += float64(value / 1000)
+				if temperature[i] >= max[i] {
+					bc.BarColor = termui.ColorRed
+				}
 			}
 			bc.Data = temperature
 			rotate++
@@ -253,27 +292,33 @@ func main() {
 			for i := range temperature_history {
 				temperature_history[i] = append(
 					temperature_history[i][1:],
-					temperature_temp_sum[i]/float64(avg_duration))
+					temperature_temp_sum[i]/
+						float64(avg_duration))
+				temperature_temp_sum[i] = 0
 			}
-			temperature_temp_sum = make([]float64, num_of_inputs)
 			for i := range lc {
-				lc[i].Data = temperature_history[i][lc_dataoffset:]
+				lc[i].Data =
+					temperature_history[i][lc_dataoffset:]
 			}
 			termui.Render(termui.Body)
 		case e := <-evt:
 			// termui event.
 			// If q pressed, quit. If arrow up/down resize height.
-			if e.Type == termui.EventKey && e.Ch == 'q' {
+			if e.Type == termui.EventKey &&
+				(e.Ch == 'q' || e.Ch == 'Q') {
 				return
-			} else if e.Type == termui.EventKey && e.Key == termui.KeyArrowDown {
+			} else if e.Type == termui.EventKey &&
+				e.Key == termui.KeyArrowDown {
 				terminal_height += (num_of_inputs + 1) / 2
 				calc_row_height()
 				termui.Body.Align()
 				termui.Render(termui.Body)
-			} else if e.Type == termui.EventKey && e.Key == termui.KeyArrowUp {
+			} else if e.Type == termui.EventKey &&
+				e.Key == termui.KeyArrowUp {
 				// We do have a minimum terminal height.
 				if terminal_height > 8*(num_of_inputs+1)/2 {
-					terminal_height -= (num_of_inputs + 1) / 2
+					terminal_height -=
+						(num_of_inputs + 1) / 2
 					calc_row_height()
 					termui.Body.Align()
 					termui.Render(termui.Body)
