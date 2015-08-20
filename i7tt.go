@@ -39,14 +39,17 @@ var max_files = []string{}
 var history_length = 500
 
 var (
-	avg_duration  int
-	num_of_inputs int
+	avg_duration    int
+	num_of_inputs   int
+	terminal_height int
 )
 
 func init() {
 	flag.IntVar(&avg_duration, "avg", 30, "avg period in seconds")
 	flag.IntVar(&avg_duration, "a", 30, "avg period in seconds"+
 		" (shorthand)")
+	flag.IntVar(&terminal_height, "height", 36, "height in rows")
+	flag.IntVar(&terminal_height, "h", 36, "height in rows"+" (shorthand)")
 }
 
 func check(e error) {
@@ -75,7 +78,6 @@ func detect_sensors() {
 	}
 
 	_ = filepath.Walk("/sys/devices/platform/", check)
-	fmt.Println(temperature_files)
 }
 
 func main() {
@@ -109,14 +111,11 @@ func main() {
 	check(err)
 	defer termui.Close()
 
-	// total height should be about 48 lines
-	row_height := 48 * 2 / (num_of_inputs + 1)
 	// Create a BarChart
 	bc := termui.NewBarChart()
 	bc.Border.Label = " CPU Temperatures (°C), press Q to quit"
 	bc.Border.LabelFgColor = termui.ColorWhite | termui.AttrBold
 	bc.TextColor = termui.ColorMagenta
-	bc.Height = row_height
 	bc.DataLabels = label
 	bc.NumColor = termui.ColorWhite | termui.AttrBold
 	bc.BarGap = 1
@@ -132,9 +131,34 @@ func main() {
 	for i := range lc {
 		lc[i] = termui.NewLineChart()
 		lc[i].Border.Label = " " + label[i] + add_to_label
-		lc[i].Height = row_height
 		lc[i].LineColor = termui.ColorMagenta | termui.AttrBold
 		lc[i].Border.LabelFgColor = termui.ColorGreen | termui.AttrBold
+	}
+
+	// calc_row_height calculates the height for each row and applies it
+	// to our widgets.
+	calc_row_height := func() {
+		// Calculate row height
+		row_height := terminal_height * 2 / (num_of_inputs + 1)
+		bc.Height = row_height
+		for i := range lc {
+			lc[i].Height = row_height
+		}
+	}
+
+	// calc_lc_dataoffset calculates the linechart's data offset (slice of data)
+	calc_lc_dataoffset := func() int {
+		length := (termui.Body.Width/2)*2 - 18
+		if length > history_length {
+			length = history_length
+		}
+		return history_length - length
+	}
+
+	// calc_bc_barwidth calculate the barchart's barwidth in order for the bars
+	// to fill the chart.
+	calc_bc_barwidth := func() int {
+		return ((termui.Body.Width / 2) - 3 - num_of_inputs) / num_of_inputs
 	}
 
 	// temperature holds the current temperatures
@@ -161,6 +185,7 @@ func main() {
 		termui.NewRow(
 			termui.NewCol(6, 0, lc[3]),
 			termui.NewCol(6, 0, lc[4])))
+	calc_row_height()
 	termui.Body.Align()
 
 	// Calculate the barchart's barwidth from current term width.
@@ -218,9 +243,22 @@ func main() {
 			termui.Render(termui.Body)
 		case e := <-evt:
 			// termui event.
-			// If q pressed, quit.
+			// If q pressed, quit. If arrow up/down resize height.
 			if e.Type == termui.EventKey && e.Ch == 'q' {
 				return
+			} else if e.Type == termui.EventKey && e.Key == termui.KeyArrowDown {
+				terminal_height += (num_of_inputs + 1) / 2
+				calc_row_height()
+				termui.Body.Align()
+				termui.Render(termui.Body)
+			} else if e.Type == termui.EventKey && e.Key == termui.KeyArrowUp {
+				// We do have a minimum terminal height.
+				if terminal_height > 8*(num_of_inputs+1)/2 {
+					terminal_height -= (num_of_inputs + 1) / 2
+					calc_row_height()
+					termui.Body.Align()
+					termui.Render(termui.Body)
+				}
 			}
 			// If resize event, calculate new barchart barwidth
 			// and linechart data offset.
@@ -237,19 +275,4 @@ func main() {
 			}
 		}
 	}
-}
-
-// calc_lc_dataoffset calculates the linechart's data offset (slice of data)
-func calc_lc_dataoffset() int {
-	length := (termui.Body.Width/2)*2 - 18
-	if length > history_length {
-		length = history_length
-	}
-	return history_length - length
-}
-
-// calc_bc_barwidth calculate the barchart's barwidth in order for the bars
-// to fill the chart.
-func calc_bc_barwidth() int {
-	return ((termui.Body.Width / 2) - 3 - num_of_inputs) / num_of_inputs
 }
