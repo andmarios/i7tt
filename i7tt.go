@@ -153,6 +153,7 @@ func main() {
 
 	// MainLoop:
 	rotate := 0 // used to track the current avg period current step
+	evt := termui.EventCh()
 	for {
 		select {
 		case <-counter:
@@ -187,7 +188,7 @@ func main() {
 				lc[i].Data = temperature_history[i][lc_dataoffset:]
 			}
 			termui.Render(termui.Body)
-		case e := <-termui.EventCh():
+		case e := <-evt:
 			// termui event.
 			// If q pressed, quit.
 			if e.Type == termui.EventKey && e.Ch == 'q' {
