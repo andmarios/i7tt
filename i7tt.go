@@ -20,26 +20,21 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/gizak/termui"
 	"io/ioutil"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
-var temperature_files = []string{
-	"/sys/devices/platform/coretemp.0/hwmon/hwmon1/temp1_input",
-	"/sys/devices/platform/coretemp.0/hwmon/hwmon1/temp2_input",
-	"/sys/devices/platform/coretemp.0/hwmon/hwmon1/temp3_input",
-	"/sys/devices/platform/coretemp.0/hwmon/hwmon1/temp4_input",
-	"/sys/devices/platform/coretemp.0/hwmon/hwmon1/temp5_input"}
-
-var label_files = []string{
-	"/sys/devices/platform/coretemp.0/hwmon/hwmon1/temp1_label",
-	"/sys/devices/platform/coretemp.0/hwmon/hwmon1/temp2_label",
-	"/sys/devices/platform/coretemp.0/hwmon/hwmon1/temp3_label",
-	"/sys/devices/platform/coretemp.0/hwmon/hwmon1/temp4_label",
-	"/sys/devices/platform/coretemp.0/hwmon/hwmon1/temp5_label"}
+var temperature_files = []string{}
+var label_files = []string{}
+var critical_files = []string{}
+var max_files = []string{}
 
 var history_length = 500
 
@@ -60,9 +55,37 @@ func check(e error) {
 	}
 }
 
+func detect_sensors() {
+	inputs, _ := regexp.Compile("coretemp.*temp([0-9]+)_input")
+	labels, _ := regexp.Compile("coretemp.*temp([0-9]+)_label")
+	criticals, _ := regexp.Compile("coretemp.*temp([0-9]+)_critical")
+	maxes, _ := regexp.Compile("coretemp.*temp([0-9]+)_max")
+
+	check := func(path string, f os.FileInfo, err error) error {
+		if inputs.MatchString(path) {
+			temperature_files = append(temperature_files, path)
+		} else if labels.MatchString(path) {
+			label_files = append(label_files, path)
+		} else if criticals.MatchString(path) {
+			critical_files = append(critical_files, path)
+		} else if maxes.MatchString(path) {
+			max_files = append(max_files, path)
+		}
+		return nil
+	}
+
+	_ = filepath.Walk("/sys/devices/platform/", check)
+	fmt.Println(temperature_files)
+}
+
 func main() {
 	flag.Parse()
+	detect_sensors()
+
 	num_of_inputs = len(temperature_files)
+	if num_of_inputs == 0 {
+		fmt.Println("No sensors found. Exiting.")
+	}
 
 	// Read temperature labels from /sys
 	label := append([]string(nil), label_files...)
@@ -86,12 +109,14 @@ func main() {
 	check(err)
 	defer termui.Close()
 
+	// total height should be about 48 lines
+	row_height := 48 * 2 / (num_of_inputs + 1)
 	// Create a BarChart
 	bc := termui.NewBarChart()
 	bc.Border.Label = " CPU Temperatures (°C), press Q to quit"
 	bc.Border.LabelFgColor = termui.ColorWhite | termui.AttrBold
 	bc.TextColor = termui.ColorMagenta
-	bc.Height = 16
+	bc.Height = row_height
 	bc.DataLabels = label
 	bc.NumColor = termui.ColorWhite | termui.AttrBold
 	bc.BarGap = 1
@@ -107,7 +132,7 @@ func main() {
 	for i := range lc {
 		lc[i] = termui.NewLineChart()
 		lc[i].Border.Label = " " + label[i] + add_to_label
-		lc[i].Height = 16
+		lc[i].Height = row_height
 		lc[i].LineColor = termui.ColorMagenta | termui.AttrBold
 		lc[i].Border.LabelFgColor = termui.ColorGreen | termui.AttrBold
 	}
