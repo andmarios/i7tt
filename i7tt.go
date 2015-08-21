@@ -251,8 +251,10 @@ func main() {
 	// arrays may be plotted, then we assign this slice to the linecharts'
 	// data.
 	lc_dataoffset := calc_lc_dataoffset()
+	// The first time we populate the lc data arrays with the full size
+	// of the history, so that the X axis will be properly resized.
 	for i := range lc {
-		lc[i].Data = temperature_history[i][lc_dataoffset:]
+		lc[i].Data = temperature_history[i]
 	}
 
 	termui.Render(termui.Body)
@@ -328,13 +330,13 @@ func main() {
 			// and linechart data offset.
 			if e.Type == termui.EventResize {
 				termui.Body.Width = termui.TermWidth()
-				termui.Body.Align()
 				bc.BarWidth = calc_bc_barwidth()
 				lc_dataoffset = calc_lc_dataoffset()
 				for i := range lc {
 					lc[i].Data =
 						temperature_history[i][lc_dataoffset:]
 				}
+				termui.Body.Align()
 				termui.Render(termui.Body)
 			}
 		}
