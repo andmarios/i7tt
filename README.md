@@ -11,11 +11,14 @@ i7tt stands for _i7 terminal temperature_.
 
 ## Usage
 
-To run:
+To run from source:
 
     $ git clone https://github.com/andmarios/i7tt
     $ cd i7tt
+    $ go get -u
     $ go run i7tt.go
+
+You may also download a [precompiled binary for x86_64](https://github.com/andmarios/i7tt/releases/download/v1.0rc/i7tt-v1.0rc-x86_64.tbz).
 
 If you have set your go correctly, you can install it easily:
 
