@@ -1,0 +1,12 @@
+language: go
+
+go:
+  - 1.3
+  - 1.4
+  - 1.5
+  - tip
+
+before_install:
+  - go get github.com/gizak/termui
+
+script: go build -v i7tt.go
