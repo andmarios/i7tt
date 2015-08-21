@@ -1,3 +1,6 @@
+i7tt - CPU Temperature CLI Monitor [![Build Status](https://travis-ci.org/andmarios/i7tt.svg?branch=master)](https://travis-ci.org/andmarios/i7tt)
+=====================
+
 ## Introduction
 
 `i7tt` is a simple utility to show the current CPU temperature(s) and a historical average in the terminal.
