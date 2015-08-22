@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-const version = "v1.01"
+const version = "v1.02"
 
 // Here are stored the filenames of the sysfs files we use.
 var (
@@ -274,10 +274,11 @@ func main() {
 
 	// Calculate and set the barchart's barwidth from current term width.
 	calcset_bc_barwidth()
-	// Calculate the linechart's data offset from current term width.
+	// Calculate the linechart's data offset from current term width for
+	// future use.
 	lc_data_offset := calc_lc_dataoffset()
-	// Apply it:
-	set_lc_dataoffset(lc_data_offset)
+	// Set initial dataoffset to 0. This causes the X axis to resize well.
+	set_lc_dataoffset(0)
 	// Calculate and set widget's (row) height
 	calcset_row_height()
 	// Align and render our grid and widgets.
