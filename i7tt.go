@@ -31,6 +31,8 @@ import (
 	"time"
 )
 
+const version = "v1.01"
+
 // Here are stored the filenames of the sysfs files we use.
 var (
 	temperature_files []string
@@ -51,17 +53,17 @@ var (
 var history_length = 500
 
 var (
-	avg_duration    int
-	num_of_inputs   int
-	terminal_height int
+	avg_duration  int
+	num_of_inputs int
+	print_version bool
 )
 
 func init() {
 	flag.IntVar(&avg_duration, "avg", 30, "avg period in seconds")
 	flag.IntVar(&avg_duration, "a", 30, "avg period in seconds"+
 		" (shorthand)")
-	flag.IntVar(&terminal_height, "height", 36, "height in rows")
-	flag.IntVar(&terminal_height, "h", 36, "height in rows"+" (shorthand)")
+	flag.BoolVar(&print_version, "version", false, "print version")
+	flag.BoolVar(&print_version, "v", false, "print version"+" (shorthand)")
 }
 
 func check(e error) {
@@ -132,6 +134,12 @@ func read_static_values() {
 
 func main() {
 	flag.Parse()
+
+	if print_version {
+		fmt.Println("i7tt", version)
+		fmt.Println("https://github.com/andmarios/i7tt")
+		os.Exit(0)
+	}
 
 	detect_sensors()
 	read_static_values()
