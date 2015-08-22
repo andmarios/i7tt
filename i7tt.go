@@ -238,9 +238,6 @@ func main() {
 		}
 	}
 
-	calc_row_height()
-	termui.Body.Align()
-
 	// Calculate the barchart's barwidth from current term width.
 	bc.BarWidth = calc_bc_barwidth()
 	// Calculate the linechart's data offset from current term width.
@@ -257,6 +254,13 @@ func main() {
 		lc[i].Data = temperature_history[i]
 	}
 
+	terminal_height = termui.TermHeight()
+	if terminal_height < 4*(num_of_inputs+1)/2 {
+		terminal_height = 4 * (num_of_inputs + 1) / 2
+	}
+	calc_row_height()
+
+	termui.Body.Align()
 	termui.Render(termui.Body)
 
 	// MainLoop:
@@ -309,22 +313,6 @@ func main() {
 			if e.Type == termui.EventKey &&
 				(e.Ch == 'q' || e.Ch == 'Q') {
 				return
-			} else if e.Type == termui.EventKey &&
-				e.Key == termui.KeyArrowDown {
-				terminal_height += (num_of_inputs + 1) / 2
-				calc_row_height()
-				termui.Body.Align()
-				termui.Render(termui.Body)
-			} else if e.Type == termui.EventKey &&
-				e.Key == termui.KeyArrowUp {
-				// We do have a minimum terminal height.
-				if terminal_height > 8*(num_of_inputs+1)/2 {
-					terminal_height -=
-						(num_of_inputs + 1) / 2
-					calc_row_height()
-					termui.Body.Align()
-					termui.Render(termui.Body)
-				}
 			}
 			// If resize event, calculate new barchart barwidth
 			// and linechart data offset.
@@ -336,6 +324,11 @@ func main() {
 					lc[i].Data =
 						temperature_history[i][lc_dataoffset:]
 				}
+				terminal_height = termui.TermHeight()
+				if terminal_height < 4*(num_of_inputs+1)/2 {
+					terminal_height = 4 * (num_of_inputs + 1) / 2
+				}
+				calc_row_height()
 				termui.Body.Align()
 				termui.Render(termui.Body)
 			}
