@@ -147,8 +147,8 @@ func main() {
 	num_of_inputs = len(temperature_files)
 	// You may uncomment the next two lines to test with one less sensor.
 	// This is useful to debug for cases of odd and even num of sensors.
-	//	num_of_inputs -= 1
-	//	temperature_files = temperature_files[1:]
+	// num_of_inputs -= 1
+	// temperature_files = temperature_files[1:]
 	if num_of_inputs == 0 {
 		fmt.Println("No sensors found. Exiting.")
 		os.Exit(1)
@@ -207,9 +207,13 @@ func main() {
 		// Calculate row height
 		terminal_height := termui.TermHeight()
 		if terminal_height < 4*(num_of_inputs+1)/2 {
-			terminal_height = 4 * (num_of_inputs + 1) / 2
+			terminal_height = 4 * (num_of_inputs + 2) / 2
 		}
-		row_height := terminal_height * 2 / (num_of_inputs + 1)
+		// This equation should stay this way. Since we are dealing with
+		// integers which always get rounded down (e.g 1.9 turns 1),
+		// the sequence we perform the operations matters.
+		// It isn't your normal, real world floating point math. :)
+		row_height := terminal_height / ((num_of_inputs + 2) / 2)
 		// Apply height
 		bc.Height = row_height
 		for i := range lc {
