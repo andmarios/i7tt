@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-const version = "v1.02"
+const version = "v1.03"
 
 // Here are stored the filenames of the sysfs files we use.
 var (
