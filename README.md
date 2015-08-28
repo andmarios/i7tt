@@ -33,6 +33,19 @@ You may set the average period length (default 30 seconds):
 
     $ i7tt -a 5
 
+## Colors
+
+i7tt should work nicely with any color scheme with a dark background.
+
+Barchart's color are:
+
+- Green: All sensors report a temperature `< max temperature - 25°C`.
+- Yellow: All sensors report a temperature lower than their reported max temperature and at least
+one sensor reports a sensor `>= max temperature - 25°C`.
+- Red: At least one sensor reports a temperature `> max temperature`.
+
+Max temperature for each sensor is read from sysfs.
+
 ## Hacking
 
 Since the sysfs interface of hwmon devices is standard, it should be easy to

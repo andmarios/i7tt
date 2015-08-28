@@ -286,29 +286,44 @@ func main() {
 	termui.Render(termui.Body)
 
 	// MainLoop:
-	rotate := 0 // used to track the current_avg period current step
+	rotate := 0                          // used to track the current_avg period current step
+	mediumtemp, hightemp := false, false // used to set barchart color
 	evt := termui.EventCh()
 	for {
 		select {
 		case <-counter:
-			// Refresh counter. Read temps and update barchart.
-			bc.BarColor = termui.ColorYellow
-			// Read temperatures and  update arrays and barchart.
+			mediumtemp, hightemp = false, false
+			// Read temperatures and update arrays, barchart, color.
 			for i, file := range temperature_files {
+				// Read from sysfs
 				dat, err := ioutil.ReadFile(file)
 				check(err)
 				value_string :=
 					strings.TrimSuffix(string(dat), "\n")
 				value, err := strconv.Atoi(string(value_string))
 				check(err)
-
+				// Update arrays
 				temperature[i] = value / 1000
 				temperature_temp_sum[i] += float64(value / 1000)
-				if temperature[i] >= max[i] {
-					bc.BarColor = termui.ColorRed
+				// Update color vars
+				// If temperature >= max allowed - 25 °C
+				if temperature[i] >= max[i]-25 {
+					// if > max allowed => red
+					if temperature[i] >= max[i] {
+						hightemp = true
+					} else { // else yellow
+						mediumtemp = true
+					}
 				}
 			}
 			bc.Data = temperature
+			if hightemp {
+				bc.BarColor = termui.ColorRed
+			} else if mediumtemp {
+				bc.BarColor = termui.ColorYellow
+			} else {
+				bc.BarColor = termui.ColorGreen
+			}
 			// Check if we need to tick counter_avg
 			rotate++
 			if rotate == avg_duration {
