@@ -21,7 +21,7 @@ To run from source:
     $ go get -u
     $ go run i7tt.go
 
-You may download a [precompiled binary for x86_64](https://github.com/andmarios/i7tt/releases/download/v1.02/i7tt-v1.02-x86_64.tbz).
+You may download a [precompiled binary for x86_64](https://github.com/andmarios/i7tt/releases/download/v1.03/i7tt-v1.03-x86_64.tbz).
 For Gentoo users there is an [ebuild available](https://github.com/andmarios/ebuilds_backyard/tree/master/app-admin/i7tt).
 
 If you have set your go correctly, you can install it easily:
