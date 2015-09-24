@@ -15,13 +15,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-// A Linux package to display the CPU temperature of Intel CPUs.
+/*
+Command i7tt shows the temperatures reported by your Intel CPU and
+a historical average for each.
+
+    $ go get github.com/andmarios/i7tt
+*/
 package main
 
 import (
 	"flag"
 	"fmt"
-	"github.com/gizak/termui"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -29,6 +33,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gizak/termui"
 )
 
 const version = "v1.03"
