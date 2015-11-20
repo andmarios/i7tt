@@ -34,7 +34,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gizak/termui"
+	"gopkg.in/gizak/termui.v1"
 )
 
 const version = "v1.03"
